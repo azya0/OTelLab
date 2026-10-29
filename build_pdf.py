@@ -1,3 +1,4 @@
+import argparse
 import ctypes
 import ctypes.util
 import html
@@ -106,9 +107,10 @@ class PdfDocument:
     width, height, margin = 595.276, 841.89, 49
     bottom = 789
 
-    def __init__(self, path):
+    def __init__(self, path, title="Наблюдаемость микросервисов: план обзора и источники", footer="План обзора литературы • 14.10.2026"):
+        self.footer_text = footer
         self.surface = cairo_pdf_surface_create(os.fsencode(path), self.width, self.height)
-        cairo_pdf_surface_set_metadata(self.surface, 0, 'Наблюдаемость микросервисов: предварительный список литературы'.encode())
+        cairo_pdf_surface_set_metadata(self.surface, 0, title.encode())
         cairo_pdf_surface_set_metadata(self.surface, 1, 'Соколов Артем Николаевич'.encode())
         cairo_pdf_surface_set_metadata(self.surface, 2, 'OpenTelemetry, диагностика, трассировки, отбор данных'.encode())
         self.context = cairo_create(self.surface)
@@ -212,7 +214,7 @@ class PdfDocument:
         cairo_move_to(self.context, self.margin, 804)
         cairo_line_to(self.context, self.width - self.margin, 804)
         cairo_stroke(self.context)
-        self.draw('Предварительный список литературы • 29.10.2026', self.margin, 812, 425, 8, sans=True, tint=(.4, .43, .46))
+        self.draw(self.footer_text, self.margin, 812, 425, 8, sans=True, tint=(.4, .43, .46))
         self.draw(str(self.page), self.width - self.margin - 20, 812, 20, 8, sans=True)
 
     def new_page(self):
@@ -368,11 +370,18 @@ def render_markdown(pdf, lines):
 
 
 def main():
-    source = ROOT / 'plan_obzora.md'
+    parser = argparse.ArgumentParser(description='Сборка PDF из Markdown')
+    parser.add_argument('source', nargs='?', default='plan_obzora.md')
+    args = parser.parse_args()
+    source = ROOT / args.source
     destination = ROOT / 'artefacts' / source.with_suffix('.pdf').name
     lines = source.read_text(encoding='utf-8').splitlines()
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with PdfDocument(destination) as pdf:
+    options = {}
+    if source.stem == 'predvaritelny_spisok_literatury':
+        options = {'title': 'Наблюдаемость микросервисов: предварительный список литературы',
+                   'footer': 'Предварительный список литературы • 29.10.2026'}
+    with PdfDocument(destination, **options) as pdf:
         render_markdown(pdf, lines)
     print(f'{destination}: {pdf.page} pages, {destination.stat().st_size} bytes')
 
